@@ -1,0 +1,11 @@
+{
+  "DEEPSEEK_URL": "https://api.deepseek.com",
+  "DEEPSEEK_MODEL": "deepseek-chat",
+  "MATH_PROMPT": "prompts/math_prompt.md",
+  "ANKICONNECT_URL": "http://127.0.0.1:8765",
+  "ANKI_DECK_NAME": "Stochastic Processes",
+  "ANKI_MODEL_NAME": "Stochastic Processes Model",
+  "ANKI_OUTPUT_PATH": "files/StochProc1.apkg",
+  "FLASHCARD_FILE_PATH": "files/flashcards.json",
+  "PROCESSED_FILES_PATH": "files/processed_files.json"
+}
