@@ -9,8 +9,3 @@ wheels/
 # Virtual environments
 .venv
 
-#My stuff
-CodeReviews/
-files/
-CLAUDE.md 
-StochProc1.pdf

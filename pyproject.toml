@@ -12,5 +12,4 @@ dependencies = [
 ]
 
 [project.scripts]
-flash_gen = "flash_gen:main"
-anki_upload = "anki_uploader:main"
+generate_cards = 'main:main'
