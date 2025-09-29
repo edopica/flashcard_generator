@@ -1,7 +1,7 @@
 import os
 import logging
 from src.utils import load_config
-from src.flash_gen import get_openai_client, process_files_in_folder, load_system_prompt
+from src.flash_gen import get_genai_client, process_files_in_folder, load_system_prompt
 from src.anki_uploader import load_flashcards, create_anki_deck, upload_deck_to_anki
 
 # Configure basic logging
@@ -26,28 +26,26 @@ def main():
     # ---------------------------------------------
     logging.info("--- Starting Flashcard Generation ---")
     # Configure parameters    
-    deepseek_url = config["DEEPSEEK_URL"]
-    deepseek_model = config["DEEPSEEK_MODEL"]
+    genai_model = config["GENAI_MODEL"]
     math_prompt_path = os.path.join(SCRIPT_DIR, config["MATH_PROMPT"])
     flashcard_path = os.path.join(SCRIPT_DIR, config["FLASHCARD_FILE_PATH"])
     processed_files_path = os.path.join(SCRIPT_DIR, config["PROCESSED_FILES_PATH"])
-
-    if not deepseek_url or not math_prompt_path:
-        logging.error("DEEPSEEK_URL or MATH_PROMPT not found in configuration.")
-        return
-
     system_prompt = load_system_prompt(math_prompt_path)
+
+    if not genai_model:
+        logging.error("GENAI_MODEL is not specified in variables.json.")
+        return
     if not system_prompt:
         logging.error(f"Prompt file '{math_prompt_path}' is empty or could not be read.")
         return
 
     try:
-        client = get_openai_client(base_url=deepseek_url)
+        client = get_genai_client()
     except ValueError as e:
         logging.error(f"Error initializing OpenAI client: {e}")
         return
     # Begin processing files
-    process_files_in_folder(PDF_SOURCE_DIR, client, deepseek_model, system_prompt, flashcard_path, processed_files_path)
+    process_files_in_folder(PDF_SOURCE_DIR, client, genai_model, system_prompt, flashcard_path, processed_files_path)
     
     logging.info("--- Flashcard Generation Finished ---")
 

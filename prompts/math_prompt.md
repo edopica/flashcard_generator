@@ -84,7 +84,7 @@ Use MathJax with `\(...\)` for inline and `\[...\]` for display math.
 * **Extra**:
 
   * Add intuition, a quick example, or a 1–3 line derivation.
-  * Add a **source note** like `Source: Lecture 1, §1.1 (p. X)` or `Lecture 2, Boole’s inequality (p. Y)`.
+  * Add a **source note** like `Source: Lecture 1, §1.1 (p. X)` or `Lecture 2, Boole’s inequality (p. Y)`. Don't write useless notes, such as "Lecture 1"
 * **Scope & granularity**: Split long items (e.g., multi-property definitions) into multiple cards (one per property) and optionally one summary card.
 * **Notation**: Match the file’s symbols and letter choices.
 * **Quality**: No duplicates; avoid overlaps. Prefer minimal wording and memory-friendly phrasing.
@@ -94,9 +94,9 @@ Use MathJax with `\(...\)` for inline and `\[...\]` for display math.
 
 Include 2–4 tags per card:
 
-* Topic: `probability`, `measure-theory`, `stochastic-processes`
-* Type: `definition`, `theorem`, `property`, `example`, `formula`, `proof-idea`
-* Source: `lecture-1`, `lecture-2` (or a short filename slug)
+* Topic: `probability`, `measure-theory`, `stochastic-processes`, ...
+* Type: `definition`, `theorem`, `property`, `example`, `formula`, `proof-idea`, ...
+* Source: `Lecture 1, §1.1 (p. X)`, `Lecture 2, Boole’s inequality (p. Y)` (or a short filename slug)
 * Level (optional): `core`, `nice-to-know`
 
 ## Safety & fidelity

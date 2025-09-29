@@ -1,40 +1,61 @@
 import os
+import pathlib
 import json
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
-import pdfplumber
-from openai import OpenAI
+from google import genai
+from google.genai import types
+from pydantic import BaseModel
 
 from src.utils import get_processed_files, add_processed_file
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def get_openai_client(base_url: str) -> OpenAI:
+class Flashcard(BaseModel):
     """
-    Initializes and returns the OpenAI client.
+    Data model for a single flashcard.
+    """
+    front: str
+    back: str
+    extra: str
+    tags: List[str]
+
+class FlashcardDeck(BaseModel):
+    """
+    Data model for a deck of flashcards.
+    """
+    flashcards: List[Flashcard]
+
+
+def get_genai_client(api_key: Optional[str] = None) -> genai.Client:
+    """
+    Initializes and returns the Google-GenAI client.
 
     Parameters
     ----------
-    - base_url: str
-        The base URL for the OpenAI API.
+    - api_key: Optional[str]
+        Optional key that overrides the one stored as environment variable
 
     Returns
     -------
-    - OpenAI
-        An instance of the OpenAI client.
+    - genai.Client
+        An instance of the genai client.
         
     Raises
     ------
     - ValueError
-        If the DEEPSEEK_API_KEY environment variable is not set.
+        If the GEMINI_API_KEY environment variable is not set.
     """
-    api_key = os.getenv("DEEPSEEK_API_KEY")
+    if api_key:
+        return genai.Client(api_key=api_key)
+        
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise ValueError("DEEPSEEK_API_KEY environment variable not set.")
+        raise ValueError("GEMINI_API_KEY environment variable not set.")
 
-    return OpenAI(api_key=api_key, base_url=base_url)
+    return genai.Client(api_key=api_key)
 
 def load_system_prompt(prompt_path: str) -> str:
     """
@@ -51,91 +72,72 @@ def load_system_prompt(prompt_path: str) -> str:
         The content of the prompt file.
     """
     try:
-        with open(prompt_path, 'r', encoding='utf-8') as f:
-            return f.read()
+        text = open(prompt_path, 'r', encoding='utf-8').read()
+        return text
     except FileNotFoundError:
         logging.error(f"Prompt file not found at '{prompt_path}'.")
         return ""
 
-def extract_text_from_pdf(pdf_path: str) -> str:
-    """
-    Extracts all text content from a given PDF file.
-
-    Parameters
-    ----------
-    - pdf_path: str
-        The full path to the PDF file.
-
-    Returns
-    -------
-    - str
-        The concatenated text content from all pages of the PDF.
-    """
-    full_text = []
-    try:
-        with pdfplumber.open(pdf_path) as pdf:
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    full_text.append(text)
-    except Exception as e:
-        logging.error(f"Error reading PDF file {pdf_path}: {e}")
-        return ""
-    return "\n".join(full_text)
-
-def generate_flashcards_from_text(
-        client: OpenAI,
+def generate_flashcards_from_pdf(
+        client: genai.Client,
         model: str,
         system_prompt: str,
-        text: str) -> List[Dict[str, str]]:
+        filepath: pathlib.Path) -> List[Dict[str, Any]]:
     """
-    Generates flashcards from text using the DeepSeek API.
+    Generates flashcards from a PDF file using the Gemini API.
 
     Parameters
     ----------
-    - client: OpenAI
-        The configured OpenAI client.
+    - client: genai.Client
+        The configured Google-GenAI client.
     - model: str
-        The deepseek version (chat | reasoner)
-    -system_prompt: str
-        The subject specific prompt.
-    - text: str
-        The text to generate flashcards from.
+        The Gemini model to use for generation.
+    - system_prompt: str
+        The subject-specific prompt for the model.
+    - filepath: pathlib.Path
+        The path to the PDF file to process.
 
     Returns
     -------
-    - List[Dict[str, str]]
+    - List[Dict[str, Any]]
         A list of flashcard dictionaries.
     """
     
-    user_prompt = f"Generate flashcards in json format based on the following text:\n\n---\n{text}\n---"
+    user_prompt = "Generate flashcards in json format based on the following document:"
 
     try:
-        response = client.chat.completions.create(
+        response = client.models.generate_content(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.5,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                response_schema=FlashcardDeck,
+            ),
+            contents=[
+                types.Part.from_bytes(
+                    data=filepath.read_bytes(),
+                    mime_type='application/pdf',
+                ),
+                user_prompt
+            ]
         )
-        response_content = response.choices[0].message.content
-        if response_content:
-            data = json.loads(response_content)
-            return data.get("flashcards", [])
+        
+        parsed_response: Optional[FlashcardDeck] = response.parsed if isinstance(response.parsed, FlashcardDeck) else None
+        if parsed_response and parsed_response.flashcards:
+            return [card.model_dump() for card in parsed_response.flashcards]
         else:
-            logging.error("Received empty response content from API.")
+            logging.warning("API returned a valid but empty flashcard deck.")
+            if 'response' in locals() and hasattr(response, 'text'):
+                logging.warning(f"Received content: {response.text}")
             return []
-    except json.JSONDecodeError as e:
-        logging.error(f"Error decoding JSON from API response: {e}")
-        logging.error(f"Received content: {response_content}") #type: ignore
-        return []
+            
     except Exception as e:
-        logging.error(f"An API error occurred: {e}")
+        logging.error(f"An API error or parsing error occurred: {e}")
+        if 'response' in locals() and hasattr(response, 'text'): #type: ignore
+            logging.error(f"Received content: {response.text}") #type: ignore
         return []
 
-def process_files_in_folder(folder_path: str, client: OpenAI, model: str, system_prompt: str, flashcard_path: str, processed_files_path: str) -> None:
+def process_files_in_folder(folder_path: str, client: genai.Client, model: str, system_prompt: str, flashcard_path: str, processed_files_path: str) -> None:
     """
     Scans a folder for PDF files, generates flashcards, and saves them to a JSON file.
 
@@ -143,10 +145,10 @@ def process_files_in_folder(folder_path: str, client: OpenAI, model: str, system
     ----------
     - folder_path: str
         The path to the folder containing PDF files.
-    - client: OpenAI
-        The configured OpenAI client.
+    - client: genai.Client
+        The configured Google-GenAI client.
     - model: str
-        The deepseek version (chat | reasoner)
+        The Gemini model to use for generation.
     - system_prompt: str
         The subject specific prompt.
     - flashcard_path: str
@@ -158,30 +160,23 @@ def process_files_in_folder(folder_path: str, client: OpenAI, model: str, system
     processed_files = get_processed_files(processed_files_path)
     logging.info(f"Scanning for PDF files in '{folder_path}'...")
 
-    for filename in os.listdir(folder_path):
-        if filename.lower().endswith(".pdf"):
-            pdf_path = os.path.join(folder_path, filename)
-            if pdf_path in processed_files:
-                logging.warning(f"'{filename}' has already been processed. Skipping.")
-                continue
+    # List files in folder
+    folder = pathlib.Path(folder_path)
+    for pdf_path in folder.glob("*.pdf"):
+        if str(pdf_path) in processed_files:
+            logging.warning(f"'{pdf_path.name}' has already been processed. Skipping.")
+            continue
+        
+        logging.info(f"Generating flashcards for '{pdf_path.name}'...")
+        flashcards = generate_flashcards_from_pdf(client, model, system_prompt, pdf_path)
 
-            logging.info(f"Processing '{filename}'...")
-
-            document_text = extract_text_from_pdf(pdf_path)
-            if not document_text:
-                logging.warning(f"Could not extract text from '{filename}', skipping.")
-                continue
-            
-            logging.info(f"Generating flashcards for '{filename}'...")
-            flashcards = generate_flashcards_from_text(client, model, system_prompt,  document_text)
-            
-            if flashcards:
-                all_flashcards.extend(flashcards)
-                add_processed_file(processed_files_path, pdf_path)
-                logging.info(f"Successfully generated {len(flashcards)} flashcards from '{filename}'.")
-            else:
-                logging.warning(f"No flashcards were generated for '{filename}'.")
-
+        if flashcards:
+            all_flashcards.extend(flashcards)
+            add_processed_file(processed_files_path, str(pdf_path))
+            logging.info(f"Successfully generated {len(flashcards)} flashcards from '{pdf_path.name}'.")
+        else:
+            logging.warning(f"No flashcards were generated for '{pdf_path.name}'.")
+    
     if not all_flashcards:
         logging.info("No new flashcards were generated.")
         return
