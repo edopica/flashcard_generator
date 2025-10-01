@@ -137,7 +137,14 @@ def generate_flashcards_from_pdf(
             logging.error(f"Received content: {response.text}") #type: ignore
         return []
 
-def process_files_in_folder(folder_path: str, client: genai.Client, model: str, system_prompt: str, flashcard_path: str, processed_files_path: str) -> None:
+def process_files_in_folder(
+    folder_path: str,
+    client: genai.Client,
+    model: str,
+    system_prompt: str,
+    flashcard_path: str,
+    processed_files_path: str,
+    skip_processed_files: bool = True) -> None:
     """
     Scans a folder for PDF files, generates flashcards, and saves them to a JSON file.
 
@@ -163,7 +170,7 @@ def process_files_in_folder(folder_path: str, client: genai.Client, model: str, 
     # List files in folder
     folder = pathlib.Path(folder_path)
     for pdf_path in folder.glob("*.pdf"):
-        if str(pdf_path) in processed_files:
+        if skip_processed_files and str(pdf_path) in processed_files:
             logging.warning(f"'{pdf_path.name}' has already been processed. Skipping.")
             continue
         

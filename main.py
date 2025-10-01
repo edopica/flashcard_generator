@@ -1,5 +1,6 @@
 import os
 import logging
+import argparse
 from src.utils import load_config
 from src.flash_gen import get_genai_client, process_files_in_folder, load_system_prompt
 from src.anki_uploader import load_flashcards, create_anki_deck, upload_deck_to_anki
@@ -17,6 +18,17 @@ def main():
     """
     Main function to run the complete flashcard generation and Anki upload workflow.
     """
+    # --- Argument Parsing ---
+    parser = argparse.ArgumentParser(description="Generate Anki flashcards from PDFs.")
+    parser.add_argument(
+        '--no-skip', 
+        dest='skip_processed_files', 
+        action='store_false',
+        help="Process all files, even if they have been processed before."
+    )
+    parser.set_defaults(skip_processed_files=True)
+    args = parser.parse_args()
+
     # Construct absolute path for the configuration file
     config_path = os.path.join(SCRIPT_DIR, 'variables.json')
     config = load_config(config_path)
@@ -45,7 +57,15 @@ def main():
         logging.error(f"Error initializing OpenAI client: {e}")
         return
     # Begin processing files
-    process_files_in_folder(PDF_SOURCE_DIR, client, genai_model, system_prompt, flashcard_path, processed_files_path)
+    process_files_in_folder(
+        PDF_SOURCE_DIR, 
+        client, 
+        genai_model, 
+        system_prompt, 
+        flashcard_path, 
+        processed_files_path,
+        skip_processed_files=args.skip_processed_files
+    )
     
     logging.info("--- Flashcard Generation Finished ---")
 
