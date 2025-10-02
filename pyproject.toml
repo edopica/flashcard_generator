@@ -1,7 +1,7 @@
 [project]
 name = "flashcard-generator"
 version = "0.1.0"
-description = "Add your description here"
+description = "Script for generating flashcards from PDFs and syncing them to anki."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

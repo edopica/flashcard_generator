@@ -2,8 +2,6 @@ import json
 import logging
 from typing import Dict, Any, List
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 def load_config(config_path: str = 'variables.json') -> Dict[str, Any]:
     """
     Loads configuration from a JSON file.

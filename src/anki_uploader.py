@@ -8,9 +8,6 @@ import requests
 
 from src.utils import load_config
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 def load_flashcards(file_path: str) -> List[Dict[str, Any]]:
     """
     Loads flashcards from a JSON file.

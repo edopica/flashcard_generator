@@ -10,9 +10,6 @@ from pydantic import BaseModel
 
 from src.utils import get_processed_files, add_processed_file
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 class Flashcard(BaseModel):
     """
     Data model for a single flashcard.
@@ -72,8 +69,8 @@ def load_system_prompt(prompt_path: str) -> str:
         The content of the prompt file.
     """
     try:
-        text = open(prompt_path, 'r', encoding='utf-8').read()
-        return text
+        with open(prompt_path, 'r', encoding='utf-8') as f:
+            return f.read()
     except FileNotFoundError:
         logging.error(f"Prompt file not found at '{prompt_path}'.")
         return ""
@@ -104,7 +101,7 @@ def generate_flashcards_from_pdf(
     """
     
     user_prompt = "Generate flashcards in json format based on the following document:"
-
+    response = None
     try:
         response = client.models.generate_content(
             model=model,
@@ -127,14 +124,14 @@ def generate_flashcards_from_pdf(
             return [card.model_dump() for card in parsed_response.flashcards]
         else:
             logging.warning("API returned a valid but empty flashcard deck.")
-            if 'response' in locals() and hasattr(response, 'text'):
+            if response and hasattr(response, 'text'):
                 logging.warning(f"Received content: {response.text}")
             return []
             
     except Exception as e:
         logging.error(f"An API error or parsing error occurred: {e}")
-        if 'response' in locals() and hasattr(response, 'text'): #type: ignore
-            logging.error(f"Received content: {response.text}") #type: ignore
+        if response and hasattr(response, 'text'):
+            logging.error(f"Received content: {response.text}")
         return []
 
 def process_files_in_folder(
