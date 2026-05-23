@@ -3,7 +3,7 @@ import logging
 import argparse
 from src.utils import load_config
 from src.flash_gen import get_genai_client, process_files_in_folder, load_system_prompt
-from src.anki_uploader import load_flashcards, create_anki_deck, upload_deck_to_anki, get_existing_decks
+from src.anki_uploader import load_flashcards, create_anki_deck, add_notes_to_anki, get_existing_decks
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -160,10 +160,7 @@ def main():
     # Create and upload the Anki deck
     create_anki_deck(flashcards, deck_name, model_name, output_path)
     
-    if os.path.exists(output_path):
-        upload_deck_to_anki(output_path, anki_connect_url)
-    else:
-        logging.error(f"Anki deck file was not created at '{output_path}'.")
+    add_notes_to_anki(flashcards, deck_name, model_name, anki_connect_url)
     
     logging.info("--- Anki Deck Creation and Upload Finished ---")
 

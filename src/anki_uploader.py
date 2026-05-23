@@ -112,38 +112,76 @@ def create_anki_deck(flashcards: List[Dict[str, Any]], deck_name: str, model_nam
     except Exception as e:
         logging.error(f"Error writing Anki deck file: {e}")
 
-def upload_deck_to_anki(deck_path: str, anki_connect_url: str):
-    """
-    Uploads an Anki deck to Anki using the AnkiConnect API.
-
-    Parameters
-    ----------
-    - deck_path: str The path to the .apkg file.
-    - anki_connect_url: str The URL of the AnkiConnect server.
-    """
-    absolute_deck_path = os.path.abspath(deck_path)
+def invoke_anki_connect(anki_connect_url: str, action: str, **params) -> Any:
+    """Helper function to invoke AnkiConnect API."""
     request_payload = {
-        "action": "importPackage",
+        "action": action,
         "version": 6,
-        "params": {
-            "path": absolute_deck_path
-        }
+        "params": params
     }
-
     try:
         response = requests.post(anki_connect_url, json=request_payload)
         response.raise_for_status()
         response_data = response.json()
-
         if response_data.get("error") is not None:
-            logging.error(f"AnkiConnect error: {response_data['error']}")
-        else:
-            logging.info(f"Successfully uploaded deck to Anki: {deck_path}")
-
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Failed to connect to AnkiConnect at {anki_connect_url}. Is Anki running with AnkiConnect installed? Error: {e}")
+            raise Exception(response_data["error"])
+        return response_data.get("result")
     except Exception as e:
-        logging.error(f"An unexpected error occurred during upload: {e}")
+        logging.error(f"AnkiConnect error during {action}: {e}")
+        return None
+
+def add_notes_to_anki(flashcards: List[Dict[str, Any]], deck_name: str, model_name: str, anki_connect_url: str):
+    """
+    Adds notes directly to Anki using AnkiConnect, allowing duplicates.
+    """
+    if not flashcards:
+        logging.warning("No flashcards provided to upload.")
+        return
+
+    # 1. Ensure Deck exists
+    invoke_anki_connect(anki_connect_url, "createDeck", deck=deck_name)
+
+    # 2. Ensure Model exists
+    existing_models = invoke_anki_connect(anki_connect_url, "modelNames")
+    if existing_models is not None and model_name not in existing_models:
+        logging.info(f"Creating new Anki model: {model_name}")
+        invoke_anki_connect(
+            anki_connect_url, 
+            "createModel", 
+            modelName=model_name,
+            inOrderFields=["Front", "Back", "Extra"],
+            cardTemplates=[
+                {
+                    "Name": "Card 1",
+                    "Front": "{{Front}}",
+                    "Back": "{{FrontSide}}<hr id=\"answer\">{{Back}}<br><br><small>{{Extra}}</small>"
+                }
+            ],
+            css=".card { font-family: arial; font-size: 20px; text-align: center; color: black; background-color: white; }"
+        )
+
+    # 3. Add Notes
+    notes = []
+    for card in flashcards:
+        notes.append({
+            "deckName": deck_name,
+            "modelName": model_name,
+            "fields": {
+                "Front": card.get('front', ''),
+                "Back": card.get('back', ''),
+                "Extra": card.get('extra', '')
+            },
+            "tags": card.get('tags', []),
+            "options": {
+                "allowDuplicate": True
+            }
+        })
+
+    result = invoke_anki_connect(anki_connect_url, "addNotes", notes=notes)
+    if result:
+        logging.info(f"Successfully added {len([r for r in result if r is not None])} notes to Anki.")
+    else:
+        logging.error("Failed to add notes to Anki.")
 
 def main():
     """
@@ -167,8 +205,7 @@ def main():
     flashcards = load_flashcards(flashcard_file)
     if flashcards:
         create_anki_deck(flashcards, deck_name, model_name, output_path)
-        if os.path.exists(output_path):
-            upload_deck_to_anki(output_path, anki_connect_url)
+        add_notes_to_anki(flashcards, deck_name, model_name, anki_connect_url)
 
 if __name__ == "__main__":
     main()
