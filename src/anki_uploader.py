@@ -1,12 +1,17 @@
 import json
 import logging
 import os
+import hashlib
 from typing import List, Dict, Any
 
 import genanki
 import requests
 
 from src.utils import load_config
+
+def get_deterministic_id(name: str) -> int:
+    """Generates a deterministic integer ID from a string using SHA256."""
+    return int(hashlib.sha256(name.encode('utf-8')).hexdigest(), 16) % (10**10)
 
 def load_flashcards(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -31,6 +36,32 @@ def load_flashcards(file_path: str) -> List[Dict[str, Any]]:
         logging.error(f"Error decoding JSON from {file_path}")
         return []
 
+def get_existing_decks(anki_connect_url: str) -> List[str]:
+    """
+    Fetches the list of existing deck names from Anki using AnkiConnect.
+    
+    Parameters
+    ----------
+    - anki_connect_url: str The URL of the AnkiConnect server.
+    
+    Returns
+    -------
+    - List[str] A list of deck names.
+    """
+    request_payload = {
+        "action": "deckNames",
+        "version": 6
+    }
+    try:
+        response = requests.post(anki_connect_url, json=request_payload, timeout=3)
+        response.raise_for_status()
+        response_data = response.json()
+        if response_data.get("error") is None:
+            return response_data.get("result", [])
+    except Exception as e:
+        logging.warning(f"Failed to fetch existing decks from AnkiConnect: {e}")
+    return []
+
 def create_anki_deck(flashcards: List[Dict[str, Any]], deck_name: str, model_name: str, output_path: str):
     """
     Creates an Anki deck from a list of flashcards.
@@ -47,7 +78,7 @@ def create_anki_deck(flashcards: List[Dict[str, Any]], deck_name: str, model_nam
         return
 
     anki_model = genanki.Model(
-        model_id=abs(hash(model_name)) % (10**10),
+        model_id=get_deterministic_id(model_name),
         name=model_name,
         fields=[
             {'name': 'Front'},
@@ -63,7 +94,7 @@ def create_anki_deck(flashcards: List[Dict[str, Any]], deck_name: str, model_nam
         ])
 
     anki_deck = genanki.Deck(
-        deck_id=abs(hash(deck_name)) % (10**10),
+        deck_id=get_deterministic_id(deck_name),
         name=deck_name
     )
 

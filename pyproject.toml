@@ -14,3 +14,18 @@ dependencies = [
 
 [project.scripts]
 generate_cards = 'main:main'
+fgen = 'main:main'
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["main"]
+packages = ["src"]
+
+[tool.setuptools.package-data]
+"src" = ["math_prompt.md"]
+
+[tool.uv]
+package = true

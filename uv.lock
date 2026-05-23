@@ -213,7 +213,7 @@ wheels = [
 [[package]]
 name = "flashcard-generator"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "genanki" },
     { name = "google-genai" },
